@@ -1,7 +1,7 @@
 #ifndef _UTIL
 #define _UTIL
 
-inline int clamp(int value, int low, int high) {
+inline double clamp(double value, double low, double high) {
     if (value > high)
         return high;
     else if (value < low)

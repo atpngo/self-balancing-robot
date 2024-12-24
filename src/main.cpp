@@ -5,6 +5,7 @@
 #include "light.h"
 #include "motor_pin_manager.h"
 #include "robot.h"
+#include "pid_controller.h"
 // Settings
 static const uint8_t buf_len = 20;
 
@@ -34,6 +35,7 @@ MotorPinManager motorPinsB {
 // void isrB();
 
 Robot robot(motorPinsA, motorPinsB);
+PID_Controller wheelTrackingController(10, 0, 0);
 
 // // Interrupt Service Routines
 void isrA() {
@@ -77,8 +79,6 @@ void readSerial(void *parameters) {
     if (Serial.available() > 0) {
       Serial.print("reading from serial...\n");
       c = Serial.read();
-      Serial.print("got: ");
-      Serial.println(c);
       // Update delay variable and reset buffer if we get a newline character
       if (c == 'x') {
         led_delay = atoi(buf);
@@ -104,8 +104,9 @@ void printStatusToSerial(void *parameters) {
   while (1) {
     encoderValueA = robot.getMotorA()->getEncoderValue();
     encoderValueB = robot.getMotorB()->getEncoderValue();
+    Serial.print("*");
     Serial.print(encoderValueA);
-    Serial.print(" ");
+    Serial.print(",");
     Serial.print(encoderValueB);
     Serial.print("\n");
     vTaskDelay(20/portTICK_PERIOD_MS);
@@ -121,9 +122,10 @@ void spinMotorA(void *parameters) {
   while (1) {
     encoderA = robot.getMotorA()->getEncoderValue();
     encoderB = robot.getMotorB()->getEncoderValue();
-    err = encoderA-encoderB;
-    signal = err * p;
-    if (abs(err) > 1) {
+    signal = wheelTrackingController.getCommand(encoderA, encoderB);
+    Serial.print("got this value from PID: ");
+    Serial.println(signal);
+    if (abs(signal) > 1) {
       robot.getMotorA()->spin(signal);
     }
     vTaskDelay(20/portTICK_PERIOD_MS);
@@ -146,14 +148,14 @@ void setup() {
   Serial.println("Enter a number in milliseconds to change the LED delay.");
 
   // // Start blink task
-  xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
-            toggleLED,      // Function to be called
-            "Toggle LED",   // Name of task
-            1024,           // Stack size (bytes in ESP32, words in FreeRTOS)
-            NULL,           // Parameter to pass
-            1,              // Task priority
-            NULL,           // Task handle
-            0);       // Run on one core for demo purposes (ESP32 only)
+  // xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
+  //           toggleLED,      // Function to be called
+  //           "Toggle LED",   // Name of task
+  //           1024,           // Stack size (bytes in ESP32, words in FreeRTOS)
+  //           NULL,           // Parameter to pass
+  //           1,              // Task priority
+  //           NULL,           // Task handle
+  //           0);       // Run on one core for demo purposes (ESP32 only)
             
   // // Start serial read task
   xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
@@ -172,7 +174,7 @@ void setup() {
     NULL,
     1,
     NULL,
-    1
+    0
   );
 
   // // Delete "setup and loop" task
