@@ -9,16 +9,24 @@ class Motor {
         enum MotorDirection {
             CLOCKWISE, COUNTERCLOCKWISE
         };
+        enum MotorType {
+            MAIN, SECONDARY
+        };
+        enum LinearDirection {
+            FORWARD, BACKWARD
+        };
         Motor(MotorPinManager pins);
         ~Motor();
         void updateEncoder();
         int getEncoderValue();
-        void spin(MotorDirection direction, int power);
+        void spin(LinearDirection direction, int power);
         void spin(int power);
         void stop();
+        void setMode(MotorType type);
     private:
         MotorPinManager pins;
         int encoderValue;
+        MotorType type;
 };
 
 #endif // _MOTOR

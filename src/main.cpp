@@ -18,21 +18,19 @@ Light light(2);
 MotorPinManager motorPinsA {
   .ENCODER_INTERRUPT = 18,
   .ENCODER_SIGNAL    = 19, 
-  .MOTOR_IN_A        = 4,  // swap these if the direction is bad
-  .MOTOR_IN_B        = 0, 
+  .MOTOR_IN_A        = 0,  // swap these if the direction is bad
+  .MOTOR_IN_B        = 4, 
   .ENABLE            = 16
 };
 
 MotorPinManager motorPinsB {
   .ENCODER_INTERRUPT = 33,
   .ENCODER_SIGNAL    = 32,
-  .MOTOR_IN_A        = 26, // swap these if direction incorrect
-  .MOTOR_IN_B        = 25,
+  .MOTOR_IN_A        = 25, // swap these if direction incorrect
+  .MOTOR_IN_B        = 26,
   .ENABLE            = 27
 };
 
-// void isrA();
-// void isrB();
 
 Robot robot(motorPinsA, motorPinsB);
 PID_Controller wheelTrackingController(10, 0, 0);
@@ -116,18 +114,16 @@ void printStatusToSerial(void *parameters) {
 void spinMotorA(void *parameters) {
   int encoderA;
   int encoderB;
-  int err;
-  int p = 10;
   int signal;
   while (1) {
     encoderA = robot.getMotorA()->getEncoderValue();
     encoderB = robot.getMotorB()->getEncoderValue();
     signal = wheelTrackingController.getCommand(encoderA, encoderB);
-    Serial.print("got this value from PID: ");
-    Serial.println(signal);
     if (abs(signal) > 1) {
       robot.getMotorA()->spin(signal);
     }
+    // robot.getMotorA()->spin(Motor::FORWARD, 150);
+    // robot.getMotorB()->spin(Motor::FORWARD, 150);
     vTaskDelay(20/portTICK_PERIOD_MS);
   }
 }
@@ -144,8 +140,8 @@ void setup() {
   // Configure serial and wait a second
   Serial.begin(115200);
   vTaskDelay(1000 / portTICK_PERIOD_MS);
-  Serial.println("Multi-task LED Demo");
-  Serial.println("Enter a number in milliseconds to change the LED delay.");
+
+  robot.getMotorB()->setMode(Motor::SECONDARY);
 
   // // Start blink task
   // xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
