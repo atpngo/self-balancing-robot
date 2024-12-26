@@ -1,4 +1,4 @@
-#include <Arduino.h>
+#include "Arduino.h"
 #include <stdlib.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -13,7 +13,7 @@ static const uint8_t buf_len = 20;
 // Globals
 static int led_delay = 500;   // ms
 
-Light light(2);
+Light led(2);
 
 MotorPinManager motorPinsA {
   .ENCODER_INTERRUPT = 18,
@@ -50,17 +50,13 @@ void isrB() {
 // Task: Blink LED at rate set by global variable
 void toggleLED(void *parameter) {
   while (1) {
-    light.turnOn();
+    led.turnOn();
     vTaskDelay(led_delay / portTICK_PERIOD_MS);
-    light.turnOff();
+    led.turnOff();
     vTaskDelay(led_delay / portTICK_PERIOD_MS);
   }
 }
 
-// Task: Read from serial terminal
-// Feel free to use Serial.readString() or Serial.parseInt(). I'm going to show
-// it with atoi() in case you're doing this in a non-Arduino environment. You'd
-// also need to replace Serial with your own UART code for non-Arduino.
 void readSerial(void *parameters) {
 
   char c;
@@ -102,10 +98,13 @@ void printStatusToSerial(void *parameters) {
   while (1) {
     encoderValueA = robot.getMotorA()->getEncoderValue();
     encoderValueB = robot.getMotorB()->getEncoderValue();
+    robot.calculateAngles();
     Serial.print("*");
     Serial.print(encoderValueA);
     Serial.print(",");
     Serial.print(encoderValueB);
+    Serial.print(",");
+    Serial.print(robot.getIMU()->getPitch());
     Serial.print("\n");
     vTaskDelay(20/portTICK_PERIOD_MS);
   }
@@ -122,27 +121,29 @@ void spinMotorA(void *parameters) {
     if (abs(signal) > 1) {
       robot.getMotorA()->spin(signal);
     }
-    // robot.getMotorA()->spin(Motor::FORWARD, 150);
-    // robot.getMotorB()->spin(Motor::FORWARD, 150);
     vTaskDelay(20/portTICK_PERIOD_MS);
   }
 }
+
+
 //*****************************************************************************
 // Main
 
 void setup() {
-  // Configure pins
-  light.configurePins();
+  led.turnOff();
 
   attachInterrupt(digitalPinToInterrupt(motorPinsA.ENCODER_INTERRUPT), isrA, RISING);
   attachInterrupt(digitalPinToInterrupt(motorPinsB.ENCODER_INTERRUPT), isrB, RISING);
 
   // Configure serial and wait a second
+  Wire.begin();
+  Wire.setClock(400000); 
   Serial.begin(115200);
+  while (!Serial); 
+  robot.initialize();
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-  robot.getMotorB()->setMode(Motor::SECONDARY);
-
+  led.turnOn();
   // // Start blink task
   // xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
   //           toggleLED,      // Function to be called
@@ -157,21 +158,22 @@ void setup() {
   xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
             printStatusToSerial,     // Function to be called
             "Print to Serial",  // Name of task
-            1024,           // Stack size (bytes in ESP32, words in FreeRTOS)
+            4096,           // Stack size (bytes in ESP32, words in FreeRTOS)
             NULL,           // Parameter to pass
             1,              // Task priority (must be same to prevent lockup)
             NULL,           // Task handle
             1);       // Run on one core for demo purposes (ESP32 only)
 
-  xTaskCreatePinnedToCore(
-    spinMotorA,
-    "Spin motor A",
-    1024,
-    NULL,
-    1,
-    NULL,
-    0
-  );
+  // Motor tracking
+  // xTaskCreatePinnedToCore(
+  //   spinMotorA,
+  //   "Spin motor A",
+  //   1024,
+  //   NULL,
+  //   1,
+  //   NULL,
+  //   0
+  // );
 
   // // Delete "setup and loop" task
   vTaskDelete(NULL);

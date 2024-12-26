@@ -4,6 +4,7 @@
 Light::Light(int pin) {
     pinsConfigured = false;
     led_pin = pin;
+    configurePins();
 }
 
 Light::~Light() {

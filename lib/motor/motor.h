@@ -6,7 +6,7 @@
 class Motor {
     
     public:
-        enum MotorDirection {
+        enum SpinDirection {
             CLOCKWISE, COUNTERCLOCKWISE
         };
         enum MotorType {
@@ -24,6 +24,8 @@ class Motor {
         void stop();
         void setMode(MotorType type);
     private:
+        void setSpinDirection(SpinDirection sd);
+        void setMotorSpeed(int speed);
         MotorPinManager pins;
         int encoderValue;
         MotorType type;

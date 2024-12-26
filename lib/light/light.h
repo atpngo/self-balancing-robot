@@ -9,9 +9,9 @@ class Light {
         void turnOn();
         void turnOff();
         bool isOn();
-        void configurePins();
 
     private:
+        void configurePins();
         bool state;
         int led_pin;
         bool pinsConfigured;

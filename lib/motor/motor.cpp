@@ -37,20 +37,16 @@ void Motor::spin(LinearDirection direction, int power) {
 
     if (this->type == MAIN) {
         if (direction == FORWARD) { // MAIN + FOWARD -> CLOCKWISE
-            digitalWrite(pins.MOTOR_IN_A, HIGH);
-            digitalWrite(pins.MOTOR_IN_B, LOW);
+            setSpinDirection(CLOCKWISE);
         } else if (direction == BACKWARD) {
-            digitalWrite(pins.MOTOR_IN_A, LOW);
-            digitalWrite(pins.MOTOR_IN_B, HIGH);
+            setSpinDirection(COUNTERCLOCKWISE);
         }
     }
     else if (this->type == SECONDARY) {
         if (direction == FORWARD) { // SECONDARY + FOWARD -> COUNTER-CLOCKWISE
-            digitalWrite(pins.MOTOR_IN_A, LOW);
-            digitalWrite(pins.MOTOR_IN_B, HIGH);
+            setSpinDirection(COUNTERCLOCKWISE);
         } else if (direction == BACKWARD) {
-            digitalWrite(pins.MOTOR_IN_A, HIGH);
-            digitalWrite(pins.MOTOR_IN_B, LOW);
+            setSpinDirection(CLOCKWISE);
         }
     }
 
@@ -74,4 +70,19 @@ void Motor::stop() {
 
 void Motor::setMode(MotorType type) {
     this->type = type;
+}
+
+void Motor::setSpinDirection(SpinDirection sd) {
+    if (sd == COUNTERCLOCKWISE) {
+        digitalWrite(pins.MOTOR_IN_A, LOW);
+        digitalWrite(pins.MOTOR_IN_B, HIGH);
+    }
+    else if (sd == CLOCKWISE) {
+        digitalWrite(pins.MOTOR_IN_A, HIGH);
+        digitalWrite(pins.MOTOR_IN_B, LOW);
+    }
+}
+
+void Motor::setMotorSpeed(int speed) {
+    analogWrite(pins.ENABLE, speed);
 }
