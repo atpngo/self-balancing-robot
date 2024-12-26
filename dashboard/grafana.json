@@ -30,6 +30,87 @@
         "fieldConfig": {
           "defaults": {
             "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "max": 90,
+            "min": -90,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": -5
+                },
+                {
+                  "color": "green",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 5
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "id": 2,
+        "options": {
+          "minVizHeight": 75,
+          "minVizWidth": 75,
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true,
+          "sizing": "auto"
+        },
+        "pluginVersion": "11.2.0",
+        "targets": [
+          {
+            "channel": "stream/self_balancing_robot/robot",
+            "datasource": {
+              "type": "datasource",
+              "uid": "grafana"
+            },
+            "filter": {
+              "fields": [
+                "time",
+                "pitch"
+              ]
+            },
+            "queryType": "measurements",
+            "refId": "A"
+          }
+        ],
+        "title": "Pitch Angle",
+        "type": "gauge"
+      },
+      {
+        "datasource": {
+          "default": false,
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
               "mode": "palette-classic"
             },
             "custom": {
@@ -86,7 +167,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 0
+          "y": 8
         },
         "id": 1,
         "maxDataPoints": 1187,
@@ -120,7 +201,7 @@
             "refId": "A"
           }
         ],
-        "title": "Panel Title",
+        "title": "Encoder Values",
         "type": "timeseries"
       }
     ],
@@ -137,6 +218,6 @@
     "timezone": "browser",
     "title": "Self Balancing Robot",
     "uid": "de7x5g6lang8wc",
-    "version": 1,
+    "version": 2,
     "weekStart": ""
   }

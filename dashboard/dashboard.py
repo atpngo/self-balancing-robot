@@ -43,10 +43,11 @@ class Monitor:
 
 
 if __name__ == "__main__":
-    tags = ["encoder_A", "encoder_B"]
+    tags = ["encoder_A", "encoder_B", "pitch"]
     monitor = Monitor("/dev/cu.usbserial-0001", 115200)
     socket = TelegrafSocket("127.0.0.1", 4000)
     formatter = Formatter(tags)
+    print("Sending serial data to Grafana...")
     while True:
         line = monitor.get_line()
         if not line:
