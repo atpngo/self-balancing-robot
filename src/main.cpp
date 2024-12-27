@@ -82,7 +82,6 @@ void isrB() {
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)  {
   memcpy(&myData, incomingData, sizeof(myData));
   // Handle command here
-  Serial.println("RECEIVED DATA, WOOT WOOT");
   switch (myData.command) {
     case (NOP):
       break;
@@ -208,7 +207,7 @@ void printStatusToSerial(void *parameters) {
     // } else {
     //   robot.getMotorB()->stop();
     // }
-    vTaskDelay(200/portTICK_PERIOD_MS);
+    vTaskDelay(10/portTICK_PERIOD_MS);
   }
 }
 
