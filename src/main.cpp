@@ -6,12 +6,46 @@
 #include "motor_pin_manager.h"
 #include "robot.h"
 #include "pid_controller.h"
+#include "WiFi.h"
+#include <esp_now.h>
+
+
+// Test bed MAC:    EC:64:C9:85:4B:F8
+// Transmitter MAC: EC:64:C9:85:91:B0
 // Settings
 static const uint8_t buf_len = 20;
+uint8_t broadcastAddress[] = {0xEC, 0x64, 0xC9, 0x85, 0x91, 0xB0}; 
+esp_now_peer_info_t peerInfo;
 
+typedef struct message_from_robot {
+  float pitch;
+  float yaw;
+  int encoderA;
+  int encoderB;
+  bool isArmed;
+  bool isServoActivated;
+} message_from_robot;
+
+enum Command {
+  NOP, 
+  CALIBRATE_IMU,
+  ARM,
+  ABORT,
+  FORWARD,
+  BACKWARD,
+  TURN_CCW,
+  TURN_CW,
+  ACTIVATE_SERVO
+};
+
+typedef struct message_to_robot {
+  Command command;
+} message_to_robot;
 
 // Globals
 static int led_delay = 500;   // ms
+message_to_robot myData;
+message_from_robot outgoingData;
 
 Light led(2);
 
@@ -43,6 +77,42 @@ void isrA() {
 void isrB() {
   robot.getMotorB()->updateEncoder();
 }
+
+// ESP-NOW Callbacks
+void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)  {
+  memcpy(&myData, incomingData, sizeof(myData));
+  // Handle command here
+  Serial.println("RECEIVED DATA, WOOT WOOT");
+  switch (myData.command) {
+    case (NOP):
+      break;
+    case (CALIBRATE_IMU):
+      break;
+    case (ARM):
+      break;
+    case (ABORT):
+      break;
+    case (FORWARD):
+      break;
+    case (BACKWARD):
+      break;
+    case (TURN_CCW):
+      break;
+    case (TURN_CW):
+      break;
+    case (ACTIVATE_SERVO):
+      led.toggle();
+      break;
+    default:
+      break;
+  }
+}
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  // Serial.print("\r\nLast Packet Send Status:\t");
+  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
+ 
 
 //*****************************************************************************
 // Tasks
@@ -95,18 +165,50 @@ void readSerial(void *parameters) {
 void printStatusToSerial(void *parameters) {
   int encoderValueA;
   int encoderValueB;
+  float pitch;
+  float yaw;
+  bool isArmed;
+  bool isServosActivated;
   while (1) {
     encoderValueA = robot.getMotorA()->getEncoderValue();
     encoderValueB = robot.getMotorB()->getEncoderValue();
     robot.calculateAngles();
-    Serial.print("*");
-    Serial.print(encoderValueA);
-    Serial.print(",");
-    Serial.print(encoderValueB);
-    Serial.print(",");
-    Serial.print(robot.getIMU()->getPitch());
-    Serial.print("\n");
-    vTaskDelay(20/portTICK_PERIOD_MS);
+    pitch = robot.getIMU()->getPitch();
+    yaw = robot.getIMU()->getYaw();
+    isArmed = robot.getIsArmed();
+    isServosActivated = robot.getIsServoActivated();
+
+    outgoingData.encoderA = encoderValueA;
+    outgoingData.encoderB = encoderValueB;
+    outgoingData.pitch = pitch;
+    outgoingData.yaw = yaw;
+    outgoingData.isArmed = isArmed;
+    outgoingData.isServoActivated = isServosActivated;
+
+    // Send via ESPNOW
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &outgoingData, sizeof(outgoingData));
+
+    if (result == ESP_OK) {
+      // Serial.println("Sending confirmed");
+    }
+    else {
+      Serial.println("Sending error");
+    }
+    // Serial.print("*");
+    // Serial.print(encoderValueA);
+    // Serial.print(",");
+    // Serial.print(encoderValueB);
+    // Serial.print(",");
+    // Serial.print(pitch);
+    // Serial.print("\n");
+    // if (pitch > 5) {
+    //   robot.getMotorB()->spin(Motor::FORWARD, 200); 
+    // } else if (pitch < -5) {
+    //   robot.getMotorB()->spin(Motor::BACKWARD, 200); 
+    // } else {
+    //   robot.getMotorB()->stop();
+    // }
+    vTaskDelay(200/portTICK_PERIOD_MS);
   }
 }
 
@@ -131,6 +233,8 @@ void spinMotorA(void *parameters) {
 
 void setup() {
   led.turnOff();
+  
+  
 
   attachInterrupt(digitalPinToInterrupt(motorPinsA.ENCODER_INTERRUPT), isrA, RISING);
   attachInterrupt(digitalPinToInterrupt(motorPinsB.ENCODER_INTERRUPT), isrB, RISING);
@@ -140,6 +244,32 @@ void setup() {
   Wire.setClock(400000); 
   Serial.begin(115200);
   while (!Serial); 
+
+  // Set ESP32 as a Wi-Fi Station
+  WiFi.mode(WIFI_STA);
+  Serial.print("MAC: ");
+  Serial.println(WiFi.macAddress());
+  // Initilize ESP-NOW
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+ 
+  // Register the send callback
+  esp_now_register_recv_cb(OnDataRecv);
+  esp_now_register_send_cb(OnDataSent);
+  
+  // Register peer
+  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  
+  // Add peer        
+  if (esp_now_add_peer(&peerInfo) != ESP_OK){
+    Serial.println("Failed to add peer");
+    return;
+  }
+
   robot.initialize();
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 
@@ -156,24 +286,27 @@ void setup() {
             
   // // Start serial read task
   xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
-            printStatusToSerial,     // Function to be called
-            "Print to Serial",  // Name of task
-            4096,           // Stack size (bytes in ESP32, words in FreeRTOS)
-            NULL,           // Parameter to pass
-            1,              // Task priority (must be same to prevent lockup)
-            NULL,           // Task handle
-            1);       // Run on one core for demo purposes (ESP32 only)
+    printStatusToSerial,     // Function to be called
+    "Print to Serial",  // Name of task
+    4096,           // Stack size (bytes in ESP32, words in FreeRTOS)
+    NULL,           // Parameter to pass
+    1,              // Task priority (must be same to prevent lockup)
+    NULL,           // Task handle
+    1
+  );   
+
+
 
   // Motor tracking
-  // xTaskCreatePinnedToCore(
-  //   spinMotorA,
-  //   "Spin motor A",
-  //   1024,
-  //   NULL,
-  //   1,
-  //   NULL,
-  //   0
-  // );
+  xTaskCreatePinnedToCore(
+    spinMotorA,
+    "Spin motor A",
+    1024,
+    NULL,
+    1,
+    NULL,
+    0
+  );
 
   // // Delete "setup and loop" task
   vTaskDelete(NULL);

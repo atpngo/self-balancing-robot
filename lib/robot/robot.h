@@ -15,11 +15,15 @@ class Robot {
         void initialize();
         bool isReady();
         void calculateAngles();
+        bool getIsArmed();
+        bool getIsServoActivated();
 
     private:
         Motor motorA;
         Motor motorB;
         IMU imu;
+        bool isServoActivated;
+        bool isArmed;
 };
 
 #endif // _ROBOT

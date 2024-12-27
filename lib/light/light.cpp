@@ -29,3 +29,11 @@ void Light::turnOff() {
 bool Light::isOn() {
     return state;
 }
+
+void Light::toggle() {
+    if (isOn()) {
+        turnOff();
+    } else {
+        turnOn();
+    }
+}

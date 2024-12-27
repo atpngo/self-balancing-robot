@@ -5,7 +5,8 @@ Robot::Robot(MotorPinManager pinsA, MotorPinManager pinsB) :
     motorA(pinsA), 
     motorB(pinsB) 
 {
-
+    isServoActivated = false;
+    isArmed = false;
 }
 
 Robot::~Robot() {
@@ -30,7 +31,15 @@ void Robot::initialize() {
 }
 
 bool Robot::isReady() {
-    return imu.isReady();
+    return isArmed && imu.isReady();
+}
+
+bool Robot::getIsArmed() {
+    return isArmed;
+}
+
+bool Robot::getIsServoActivated() {
+    return isServoActivated;
 }
 
 void Robot::calculateAngles() {

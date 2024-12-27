@@ -9,6 +9,7 @@ class Light {
         void turnOn();
         void turnOff();
         bool isOn();
+        void toggle();
 
     private:
         void configurePins();
