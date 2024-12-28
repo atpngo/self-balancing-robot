@@ -9,6 +9,12 @@ class PID_Controller {
         void setDt(double dt);
         double getCommand(double value, double target);
         void reset();
+        double getKp();
+        double getKi();
+        double getKd();
+        void setKp(double Kp);
+        void setKi(double Ki);
+        void setKd(double Kd);
 
     private:
         double Kp;

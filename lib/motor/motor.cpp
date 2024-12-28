@@ -86,3 +86,7 @@ void Motor::setSpinDirection(SpinDirection sd) {
 void Motor::setMotorSpeed(int speed) {
     analogWrite(pins.ENABLE, speed);
 }
+
+void Motor::resetEncoder() {
+    encoderValue = 0;
+}

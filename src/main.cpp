@@ -8,6 +8,7 @@
 #include "pid_controller.h"
 #include "WiFi.h"
 #include <esp_now.h>
+// #include "ESP32Servo.h"
 
 
 // Test bed MAC:    EC:64:C9:85:4B:F8
@@ -24,10 +25,13 @@ typedef struct message_from_robot {
   int encoderB;
   bool isArmed;
   bool isServoActivated;
+  float p;
+  float i;
+  float d;
 } message_from_robot;
 
 enum Command {
-  NOP, 
+  NOP,
   CALIBRATE_IMU,
   ARM,
   ABORT,
@@ -35,11 +39,17 @@ enum Command {
   BACKWARD,
   TURN_CCW,
   TURN_CW,
-  ACTIVATE_SERVO
+  ACTIVATE_SERVO,
+  TURN_ON_LED,
+  TURN_OFF_LED
 };
 
 typedef struct message_to_robot {
   Command command;
+  bool updateController;  // set to true when you want to update PID values
+  float p;
+  float i;
+  float d;
 } message_to_robot;
 
 // Globals
@@ -65,9 +75,12 @@ MotorPinManager motorPinsB {
   .ENABLE            = 27
 };
 
+const int servoPin = 15;
 
 Robot robot(motorPinsA, motorPinsB);
 PID_Controller wheelTrackingController(10, 0, 0);
+PID_Controller balancingController(50, 0, 0);
+// Servo servo;
 
 // // Interrupt Service Routines
 void isrA() {
@@ -88,8 +101,11 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)  {
     case (CALIBRATE_IMU):
       break;
     case (ARM):
+      robot.arm();
+      led.turnOn();
       break;
     case (ABORT):
+      robot.abort();
       break;
     case (FORWARD):
       break;
@@ -100,10 +116,22 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)  {
     case (TURN_CW):
       break;
     case (ACTIVATE_SERVO):
-      led.toggle();
+      break;
+    case (TURN_ON_LED):
+      led.turnOn();
+      break;
+    case (TURN_OFF_LED):
+      led.turnOff();
       break;
     default:
       break;
+  }
+
+  // handle received PID values
+  if (myData.updateController) {
+    balancingController.setKp(myData.p);
+    balancingController.setKi(myData.i);
+    balancingController.setKd(myData.d);
   }
 }
 
@@ -126,64 +154,19 @@ void toggleLED(void *parameter) {
   }
 }
 
-void readSerial(void *parameters) {
-
-  char c;
-  char buf[buf_len];
-  uint8_t idx = 0;
-
-  // Clear whole buffer
-  memset(buf, 0, buf_len);
-
-  // Loop forever
-  while (1) {
-
-    // Read characters from serial
-    if (Serial.available() > 0) {
-      Serial.print("reading from serial...\n");
-      c = Serial.read();
-      // Update delay variable and reset buffer if we get a newline character
-      if (c == 'x') {
-        led_delay = atoi(buf);
-        Serial.print("Updated LED delay to: ");
-        Serial.println(led_delay);
-        memset(buf, 0, buf_len);
-        idx = 0;
-      } else {
-        
-        // Only append if index is not over message limit
-        if (idx < buf_len - 1) {
-          buf[idx] = c;
-          idx++;
-        }
-      }
-    }
-  }
-}
 
 void printStatusToSerial(void *parameters) {
-  int encoderValueA;
-  int encoderValueB;
-  float pitch;
-  float yaw;
-  bool isArmed;
-  bool isServosActivated;
   while (1) {
-    encoderValueA = robot.getMotorA()->getEncoderValue();
-    encoderValueB = robot.getMotorB()->getEncoderValue();
     robot.calculateAngles();
-    pitch = robot.getIMU()->getPitch();
-    yaw = robot.getIMU()->getYaw();
-    isArmed = robot.getIsArmed();
-    isServosActivated = robot.getIsServoActivated();
-
-    outgoingData.encoderA = encoderValueA;
-    outgoingData.encoderB = encoderValueB;
-    outgoingData.pitch = pitch;
-    outgoingData.yaw = yaw;
-    outgoingData.isArmed = isArmed;
-    outgoingData.isServoActivated = isServosActivated;
-
+    outgoingData.encoderA = robot.getMotorA()->getEncoderValue();
+    outgoingData.encoderB = robot.getMotorB()->getEncoderValue();
+    outgoingData.pitch = robot.getIMU()->getPitch();
+    outgoingData.yaw = robot.getIMU()->getYaw();
+    outgoingData.isArmed = robot.isArmed();
+    outgoingData.isServoActivated = robot.isServoActivated();
+    outgoingData.p = balancingController.getKp();
+    outgoingData.i = balancingController.getKi();
+    outgoingData.d = balancingController.getKd();
     // Send via ESPNOW
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &outgoingData, sizeof(outgoingData));
 
@@ -193,20 +176,6 @@ void printStatusToSerial(void *parameters) {
     else {
       Serial.println("Sending error");
     }
-    // Serial.print("*");
-    // Serial.print(encoderValueA);
-    // Serial.print(",");
-    // Serial.print(encoderValueB);
-    // Serial.print(",");
-    // Serial.print(pitch);
-    // Serial.print("\n");
-    // if (pitch > 5) {
-    //   robot.getMotorB()->spin(Motor::FORWARD, 200); 
-    // } else if (pitch < -5) {
-    //   robot.getMotorB()->spin(Motor::BACKWARD, 200); 
-    // } else {
-    //   robot.getMotorB()->stop();
-    // }
     vTaskDelay(10/portTICK_PERIOD_MS);
   }
 }
@@ -216,15 +185,63 @@ void spinMotorA(void *parameters) {
   int encoderB;
   int signal;
   while (1) {
-    encoderA = robot.getMotorA()->getEncoderValue();
-    encoderB = robot.getMotorB()->getEncoderValue();
-    signal = wheelTrackingController.getCommand(encoderA, encoderB);
-    if (abs(signal) > 1) {
-      robot.getMotorA()->spin(signal);
+    // TODO: move conditional logic into robot class, fix how we control motors from main
+    if (robot.isArmed()) {
+      encoderA = robot.getMotorA()->getEncoderValue();
+      encoderB = robot.getMotorB()->getEncoderValue();
+      signal = wheelTrackingController.getCommand(encoderA, encoderB);
+      if (abs(signal) > 1) {
+        robot.spinA(signal);
+      }
     }
-    vTaskDelay(20/portTICK_PERIOD_MS);
+    
+    vTaskDelay(50/portTICK_PERIOD_MS);
   }
 }
+
+void balance(void *parameters) {
+  double pitch;
+  double command;
+  while (1) {
+    if (robot.isArmed()) {
+      robot.calculateAngles();
+      pitch = robot.getIMU()->getPitch();
+      if (abs(pitch) > 30.0) {
+        robot.abort();
+      } else {  
+        command = balancingController.getCommand(pitch, 0.0);
+        robot.spinA(command);
+        robot.spinB(command);
+      }
+
+    }
+    
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+  }
+
+}
+
+// void sweepServo(void *parameters) {
+//   int pos = 0;
+//   while (1) {
+//     servo.write(0);
+//     vTaskDelay(1000/ portTICK_PERIOD_MS);
+//     servo.write(90);
+//     vTaskDelay(1000/ portTICK_PERIOD_MS);
+//     servo.write(180);
+//     vTaskDelay(1000/ portTICK_PERIOD_MS);
+
+//     // for (pos = 0; pos<180; pos++) {
+//     //   servo.write(pos);
+//     //   vTaskDelay(15 / portTICK_PERIOD_MS);
+//     // }
+//     // // sweep back
+//     // for (pos = 180; pos >= 0; pos--) {
+//     //   servo.write(pos);
+//     //   vTaskDelay(15 / portTICK_PERIOD_MS);
+//     // }
+//   }
+// }
 
 
 //*****************************************************************************
@@ -233,7 +250,12 @@ void spinMotorA(void *parameters) {
 void setup() {
   led.turnOff();
   
-  
+  // ESP32PWM::allocateTimer(0);
+	// ESP32PWM::allocateTimer(1);
+	// ESP32PWM::allocateTimer(2);
+	// ESP32PWM::allocateTimer(3);
+  // servo.setPeriodHertz(50);
+  // servo.attach(servoPin, 500, 2400);
 
   attachInterrupt(digitalPinToInterrupt(motorPinsA.ENCODER_INTERRUPT), isrA, RISING);
   attachInterrupt(digitalPinToInterrupt(motorPinsB.ENCODER_INTERRUPT), isrB, RISING);
@@ -273,15 +295,6 @@ void setup() {
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 
   led.turnOn();
-  // // Start blink task
-  // xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
-  //           toggleLED,      // Function to be called
-  //           "Toggle LED",   // Name of task
-  //           1024,           // Stack size (bytes in ESP32, words in FreeRTOS)
-  //           NULL,           // Parameter to pass
-  //           1,              // Task priority
-  //           NULL,           // Task handle
-  //           0);       // Run on one core for demo purposes (ESP32 only)
             
   // // Start serial read task
   xTaskCreatePinnedToCore(  // Use xTaskCreate() in vanilla FreeRTOS
@@ -294,18 +307,38 @@ void setup() {
     1
   );   
 
-
-
-  // Motor tracking
   xTaskCreatePinnedToCore(
-    spinMotorA,
-    "Spin motor A",
-    1024,
+    balance,
+    "Balance the robot",
+    4096,
     NULL,
     1,
     NULL,
     0
   );
+
+  
+  // xTaskCreatePinnedToCore(
+  //   sweepServo,
+  //   "Sweep Servo",
+  //   1024,
+  //   NULL,
+  //   1,
+  //   NULL,
+  //   1
+  // );
+
+
+  // Motor tracking
+  // xTaskCreatePinnedToCore(
+  //   spinMotorA,
+  //   "Spin motor A",
+  //   1024,
+  //   NULL,
+  //   1,
+  //   NULL,
+  //   0    
+  // );
 
   // // Delete "setup and loop" task
   vTaskDelete(NULL);

@@ -39,3 +39,28 @@ void PID_Controller::reset() {
     _integral = 0.0;
     _prev_error = 0.0;
 }
+
+double PID_Controller::getKp() {
+    return Kp;
+}
+
+double PID_Controller::getKi() {
+    return Ki;
+}
+
+double PID_Controller::getKd() {
+    return Kd;
+}
+
+
+void PID_Controller::setKp(double Kp) {
+    this->Kp = Kp;
+}
+
+void PID_Controller::setKi(double Ki) {
+    this->Ki = Ki;
+}
+
+void PID_Controller::setKd(double Kd) {
+    this->Kd = Kd;
+}

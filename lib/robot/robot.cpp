@@ -5,8 +5,8 @@ Robot::Robot(MotorPinManager pinsA, MotorPinManager pinsB) :
     motorA(pinsA), 
     motorB(pinsB) 
 {
-    isServoActivated = false;
-    isArmed = false;
+    isServoActivatedState = false;
+    isArmedState = false;
 }
 
 Robot::~Robot() {
@@ -31,18 +31,49 @@ void Robot::initialize() {
 }
 
 bool Robot::isReady() {
-    return isArmed && imu.isReady();
+    return isArmedState && imu.isReady();
 }
 
-bool Robot::getIsArmed() {
-    return isArmed;
+bool Robot::isArmed() {
+    return isArmedState;
 }
 
-bool Robot::getIsServoActivated() {
-    return isServoActivated;
+bool Robot::isServoActivated() {
+    return isServoActivatedState;
 }
 
 void Robot::calculateAngles() {
     imu.calculateAngles();
 }
 
+void Robot::setIsArmed(bool state) {
+    isArmedState = state;
+}
+
+void Robot::arm() {
+    setIsArmed(true);
+    motorA.resetEncoder();
+    motorB.resetEncoder();
+}
+
+void Robot::abort() {
+    setIsArmed(false);
+    motorA.stop();
+    motorB.stop();
+    motorA.resetEncoder();
+    motorB.resetEncoder();
+}
+
+void Robot::spinA(int power) {
+    if (!isArmedState) {
+        return;
+    }
+    motorA.spin(power);
+}
+
+void Robot::spinB(int power) {
+    if (!isArmedState) {
+        return;
+    }
+    motorB.spin(power);
+}

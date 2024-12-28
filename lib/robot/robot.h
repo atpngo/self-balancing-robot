@@ -15,15 +15,22 @@ class Robot {
         void initialize();
         bool isReady();
         void calculateAngles();
-        bool getIsArmed();
-        bool getIsServoActivated();
+        bool isArmed();
+        bool isServoActivated();
+        void arm();
+        void abort();
+
+        // Controls
+        void spinA(int power);
+        void spinB(int power);
 
     private:
+        void setIsArmed(bool state);
         Motor motorA;
         Motor motorB;
         IMU imu;
-        bool isServoActivated;
-        bool isArmed;
+        bool isServoActivatedState;
+        bool isArmedState;
 };
 
 #endif // _ROBOT

@@ -23,6 +23,7 @@ class Motor {
         void spin(int power);
         void stop();
         void setMode(MotorType type);
+        void resetEncoder();
     private:
         void setSpinDirection(SpinDirection sd);
         void setMotorSpeed(int speed);
