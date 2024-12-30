@@ -62,16 +62,16 @@ Light led(2);
 MotorPinManager motorPinsA {
   .ENCODER_INTERRUPT = 18,
   .ENCODER_SIGNAL    = 19, 
-  .MOTOR_IN_A        = 0,  // swap these if the direction is bad
-  .MOTOR_IN_B        = 4, 
+  .MOTOR_IN_A        = 4,  // swap these if the direction is bad
+  .MOTOR_IN_B        = 0, 
   .ENABLE            = 16
 };
 
 MotorPinManager motorPinsB {
   .ENCODER_INTERRUPT = 33,
   .ENCODER_SIGNAL    = 32,
-  .MOTOR_IN_A        = 25, // swap these if direction incorrect
-  .MOTOR_IN_B        = 26,
+  .MOTOR_IN_A        = 26, // swap these if direction incorrect
+  .MOTOR_IN_B        = 25,
   .ENABLE            = 27
 };
 
@@ -216,7 +216,7 @@ void balance(void *parameters) {
 
     }
     
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    vTaskDelay(1 / portTICK_PERIOD_MS);
   }
 
 }
