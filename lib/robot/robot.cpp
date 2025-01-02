@@ -7,6 +7,8 @@ Robot::Robot(MotorPinManager pinsA, MotorPinManager pinsB) :
 {
     isServoActivatedState = false;
     isArmedState = false;
+    targetPosition = 0;
+    targetPitch = 0.0;
 }
 
 Robot::~Robot() {
@@ -56,7 +58,7 @@ void Robot::arm() {
     motorB.resetEncoder();
 }
 
-void Robot::abort() {
+void Robot::disarm() {
     setIsArmed(false);
     motorA.stop();
     motorB.stop();
@@ -76,4 +78,59 @@ void Robot::spinB(int power) {
         return;
     }
     motorB.spin(power);
+}
+
+
+void Robot::spinToPosition(int position) {
+    motorA.spinToPosition(motorA.getEncoderValue() + position);
+    motorB.spinToPosition(motorB.getEncoderValue() + position);
+}
+
+int Robot::getTargetPosition() {
+    return targetPosition;
+}
+
+void Robot::setTargetPosition(int position) {
+    targetPosition = position;
+}
+
+void Robot::moveToTargetPosition() {
+    spinToPosition(targetPosition);
+}
+
+
+double Robot::getKp() {
+    return motorA.getKp();
+}
+
+double Robot::getKi() {
+    return motorA.getKi();
+}
+
+double Robot::getKd() {
+    return motorA.getKd();
+}
+
+
+void Robot::setKp(double Kp) {
+    motorA.setKp(Kp);
+    motorB.setKp(Kp);
+}
+
+void Robot::setKi(double Ki) {
+    motorA.setKi(Ki);
+    motorB.setKi(Ki);
+}
+
+void Robot::setKd(double Kd) {
+    motorA.setKd(Kd);
+    motorB.setKd(Kd);
+}
+
+void Robot::setTargetPitch(float target) {
+    targetPitch = target;
+}
+
+float Robot::getTargetPitch() {
+    return targetPitch;
 }

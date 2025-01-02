@@ -8,10 +8,8 @@
 #include "pid_controller.h"
 #include "WiFi.h"
 #include <esp_now.h>
-// #include "ESP32Servo.h"
 
 
-// Test bed MAC:    EC:64:C9:85:4B:F8
 // Transmitter MAC: EC:64:C9:85:91:B0
 // Settings
 static const uint8_t buf_len = 20;
@@ -25,9 +23,14 @@ typedef struct message_from_robot {
   int encoderB;
   bool isArmed;
   bool isServoActivated;
-  float p;
-  float i;
-  float d;
+  // Balancing PID
+  float imuP;
+  float imuI;
+  float imuD;
+  // Motor PID
+  float motorP;
+  float motorI;
+  float motorD;
 } message_from_robot;
 
 enum Command {
@@ -47,13 +50,18 @@ enum Command {
 typedef struct message_to_robot {
   Command command;
   bool updateController;  // set to true when you want to update PID values
-  float p;
-  float i;
-  float d;
+  int controllerID; // 0 for balancer, 1 for motor
+  // Balancing PID
+  float imuP;
+  float imuI;
+  float imuD;
+  // Motor PID
+  float motorP; // temporarily use this as a potentiomeetr (lol)
+  float motorI;
+  float motorD;
 } message_to_robot;
 
 // Globals
-static int led_delay = 500;   // ms
 message_to_robot myData;
 message_from_robot outgoingData;
 
@@ -80,7 +88,6 @@ const int servoPin = 15;
 Robot robot(motorPinsA, motorPinsB);
 PID_Controller wheelTrackingController(10, 0, 0);
 PID_Controller balancingController(50, 0, 0);
-// Servo servo;
 
 // // Interrupt Service Routines
 void isrA() {
@@ -105,7 +112,7 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)  {
       led.turnOn();
       break;
     case (ABORT):
-      robot.abort();
+      robot.disarm();
       break;
     case (FORWARD):
       break;
@@ -129,9 +136,15 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)  {
 
   // handle received PID values
   if (myData.updateController) {
-    balancingController.setKp(myData.p);
-    balancingController.setKi(myData.i);
-    balancingController.setKd(myData.d);
+    if (myData.controllerID == 0) {
+      balancingController.setKp(myData.imuP);
+      balancingController.setKi(myData.imuI);
+      balancingController.setKd(myData.imuD);
+    }
+    else if (myData.controllerID == 1) {
+      // temporary
+      robot.setTargetPitch(myData.motorP);
+    }
   }
 }
 
@@ -143,18 +156,6 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 
 //*****************************************************************************
 // Tasks
-
-// Task: Blink LED at rate set by global variable
-void toggleLED(void *parameter) {
-  while (1) {
-    led.turnOn();
-    vTaskDelay(led_delay / portTICK_PERIOD_MS);
-    led.turnOff();
-    vTaskDelay(led_delay / portTICK_PERIOD_MS);
-  }
-}
-
-
 void printStatusToSerial(void *parameters) {
   while (1) {
     robot.calculateAngles();
@@ -164,9 +165,14 @@ void printStatusToSerial(void *parameters) {
     outgoingData.yaw = robot.getIMU()->getYaw();
     outgoingData.isArmed = robot.isArmed();
     outgoingData.isServoActivated = robot.isServoActivated();
-    outgoingData.p = balancingController.getKp();
-    outgoingData.i = balancingController.getKi();
-    outgoingData.d = balancingController.getKd();
+    outgoingData.imuP = balancingController.getKp();
+    outgoingData.imuI = balancingController.getKi();
+    outgoingData.imuD = balancingController.getKd();
+    // outgoingData.motorP = robot.getKp();
+    // temporary
+    outgoingData.motorP = robot.getTargetPitch();
+    outgoingData.motorI = robot.getKi();
+    outgoingData.motorD = robot.getKd();
     // Send via ESPNOW
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &outgoingData, sizeof(outgoingData));
 
@@ -191,7 +197,7 @@ void spinMotorA(void *parameters) {
       encoderB = robot.getMotorB()->getEncoderValue();
       signal = wheelTrackingController.getCommand(encoderA, encoderB);
       if (abs(signal) > 1) {
-        robot.spinA(signal);
+        robot.spinA(-1*signal);
       }
     }
     
@@ -207,11 +213,15 @@ void balance(void *parameters) {
       robot.calculateAngles();
       pitch = robot.getIMU()->getPitch();
       if (abs(pitch) > 30.0) {
-        robot.abort();
+        robot.disarm();
       } else {  
-        command = balancingController.getCommand(pitch, 0.0);
+        command = balancingController.getCommand(pitch, robot.getTargetPitch());
         robot.spinA(command);
         robot.spinB(command);
+        // robot.setTargetPosition(command);
+        // robot.moveToTargetPosition();
+        // robot.getMotorA()->spinToPosition(50);
+        // robot.getMotorB()->spinToPosition(200);
       }
 
     }
@@ -221,27 +231,6 @@ void balance(void *parameters) {
 
 }
 
-// void sweepServo(void *parameters) {
-//   int pos = 0;
-//   while (1) {
-//     servo.write(0);
-//     vTaskDelay(1000/ portTICK_PERIOD_MS);
-//     servo.write(90);
-//     vTaskDelay(1000/ portTICK_PERIOD_MS);
-//     servo.write(180);
-//     vTaskDelay(1000/ portTICK_PERIOD_MS);
-
-//     // for (pos = 0; pos<180; pos++) {
-//     //   servo.write(pos);
-//     //   vTaskDelay(15 / portTICK_PERIOD_MS);
-//     // }
-//     // // sweep back
-//     // for (pos = 180; pos >= 0; pos--) {
-//     //   servo.write(pos);
-//     //   vTaskDelay(15 / portTICK_PERIOD_MS);
-//     // }
-//   }
-// }
 
 
 //*****************************************************************************
@@ -249,13 +238,6 @@ void balance(void *parameters) {
 
 void setup() {
   led.turnOff();
-  
-  // ESP32PWM::allocateTimer(0);
-	// ESP32PWM::allocateTimer(1);
-	// ESP32PWM::allocateTimer(2);
-	// ESP32PWM::allocateTimer(3);
-  // servo.setPeriodHertz(50);
-  // servo.attach(servoPin, 500, 2400);
 
   attachInterrupt(digitalPinToInterrupt(motorPinsA.ENCODER_INTERRUPT), isrA, RISING);
   attachInterrupt(digitalPinToInterrupt(motorPinsB.ENCODER_INTERRUPT), isrB, RISING);
@@ -330,15 +312,15 @@ void setup() {
 
 
   // Motor tracking
-  // xTaskCreatePinnedToCore(
-  //   spinMotorA,
-  //   "Spin motor A",
-  //   1024,
-  //   NULL,
-  //   1,
-  //   NULL,
-  //   0    
-  // );
+  xTaskCreatePinnedToCore(
+    spinMotorA,
+    "Spin motor A",
+    1024,
+    NULL,
+    1,
+    NULL,
+    0    
+  );
 
   // // Delete "setup and loop" task
   vTaskDelete(NULL);

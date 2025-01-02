@@ -3,7 +3,7 @@
 #include "Arduino.h"
 #include "util.h"
 
-Motor::Motor(MotorPinManager pins) {
+Motor::Motor(MotorPinManager pins) : controller(0.0, 0.0, 0.0) {
     this->pins = pins;
     pinMode(pins.ENCODER_INTERRUPT, INPUT);
     pinMode(pins.ENCODER_SIGNAL, INPUT);
@@ -11,6 +11,11 @@ Motor::Motor(MotorPinManager pins) {
     pinMode(pins.MOTOR_IN_B, OUTPUT);
     encoderValue = 0;
     this->type = MAIN;
+
+    signal = 0.0;
+
+    setPID(0.0, 0.0, 0.0);
+    
 }
 
 Motor::~Motor() {
@@ -51,7 +56,7 @@ void Motor::spin(LinearDirection direction, int power) {
     }
 
     // Set speed
-    analogWrite(pins.ENABLE, speed);
+    setMotorSpeed(power);
 }
 
 void Motor::spin(int power) {
@@ -89,4 +94,47 @@ void Motor::setMotorSpeed(int speed) {
 
 void Motor::resetEncoder() {
     encoderValue = 0;
+}
+
+void Motor::spinToPosition(int targetPosition) {
+    double signal = controller.getCommand(getEncoderValue(), targetPosition);
+    Serial.print("Encoder: ");
+    Serial.print(getEncoderValue());
+    Serial.print(", Target: ");
+    Serial.print(targetPosition);
+    Serial.print(", Signal: ");
+    Serial.println(signal);
+    if (abs(signal) > 1) { // threshold
+        spin(signal);
+    }
+}
+
+void Motor::setPID(double Kp, double Ki, double Kd) {
+    setKp(Kp);
+    setKi(Ki);
+    setKd(Kd);
+}
+
+double Motor::getKp() {
+    return controller.getKp();
+}
+
+double Motor::getKi() {
+    return controller.getKi();
+}
+
+double Motor::getKd() {
+    return controller.getKd();
+}
+
+void Motor::setKp(double Kp) {
+    controller.setKp(Kp);
+}
+
+void Motor::setKi(double Ki) {
+    controller.setKi(Ki);
+}
+
+void Motor::setKd(double Kd) {
+    controller.setKd(Kd);
 }

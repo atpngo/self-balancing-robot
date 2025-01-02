@@ -18,11 +18,29 @@ class Robot {
         bool isArmed();
         bool isServoActivated();
         void arm();
-        void abort();
+        void disarm();
 
         // Controls
         void spinA(int power);
         void spinB(int power);
+
+        void spinToPosition(int position);
+
+        int getTargetPosition();
+        void setTargetPosition(int position);
+        void moveToTargetPosition();
+
+        double getKp();
+        double getKi();
+        double getKd();
+
+        void setKp(double Kp);
+        void setKi(double Ki);
+        void setKd(double Kd);
+
+        void setTargetPitch(float target);
+        float getTargetPitch();
+
 
     private:
         void setIsArmed(bool state);
@@ -31,6 +49,8 @@ class Robot {
         IMU imu;
         bool isServoActivatedState;
         bool isArmedState;
+        int targetPosition;
+        float targetPitch;
 };
 
 #endif // _ROBOT
