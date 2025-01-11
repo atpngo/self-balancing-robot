@@ -41,6 +41,7 @@ class Motor {
         MotorType type;
         PID_Controller controller;
         double signal;
+        int MIN_PMW;
 };
 
 #endif // _MOTOR

@@ -15,7 +15,7 @@ Motor::Motor(MotorPinManager pins) : controller(0.0, 0.0, 0.0) {
     signal = 0.0;
 
     setPID(0.0, 0.0, 0.0);
-    
+    MIN_PMW = 28;    
 }
 
 Motor::~Motor() {
@@ -38,7 +38,7 @@ int Motor::getEncoderValue() {
 }
 
 void Motor::spin(LinearDirection direction, int power) {
-    int speed = clamp(power, 0, 255);
+    int speed = clamp(power + MIN_PMW, 0, 255); // TODO: modify min constant
 
     if (this->type == MAIN) {
         if (direction == FORWARD) { // MAIN + FOWARD -> CLOCKWISE
@@ -56,7 +56,7 @@ void Motor::spin(LinearDirection direction, int power) {
     }
 
     // Set speed
-    setMotorSpeed(power);
+    setMotorSpeed(speed);
 }
 
 void Motor::spin(int power) {

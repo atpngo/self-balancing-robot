@@ -87,7 +87,7 @@ const int servoPin = 15;
 
 Robot robot(motorPinsA, motorPinsB);
 PID_Controller wheelTrackingController(10, 0, 0);
-PID_Controller balancingController(50, 0, 0);
+PID_Controller balancingController(20, 0, 0.5);
 
 // // Interrupt Service Routines
 void isrA() {
@@ -212,23 +212,27 @@ void balance(void *parameters) {
     if (robot.isArmed()) {
       robot.calculateAngles();
       pitch = robot.getIMU()->getPitch();
-      if (abs(pitch) > 30.0) {
-        robot.disarm();
-      } else {  
-        command = balancingController.getCommand(pitch, robot.getTargetPitch());
-        robot.spinA(command);
-        robot.spinB(command);
+      command = balancingController.getCommand(pitch, robot.getTargetPitch());
+      robot.spinA(command);
+      robot.spinB(command);
         // robot.setTargetPosition(command);
         // robot.moveToTargetPosition();
         // robot.getMotorA()->spinToPosition(50);
         // robot.getMotorB()->spinToPosition(200);
-      }
+      
 
     }
     
+    // look into task delay
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }
+  // while (1) {
+  //   robot.spinA(1);
+  //   robot.spinB(1);
+  //   vTaskDelay(1 / portTICK_PERIOD_MS);
 
+  // }
+  
 }
 
 
